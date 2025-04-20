@@ -3,10 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Species Identification</title>
+    <title>Data Entry Form</title>
     <link rel="stylesheet" href="https://github.com/boobalootoo/split2/blob/main/styles.css">
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.2.0"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
 </head>
 
 <div class="container">
@@ -19,7 +17,7 @@
     });
 </script>
 
-    <div id="species-card-container">
+    <div id="species-card-container" style="display: none;">
         <div id="species-card">
             <button id="close-card-button">Close</button>
             <img id="species-card-img" src="" alt="Species Card">
@@ -59,43 +57,8 @@
                     body: JSON.stringify(record)
                 })
                 .then(() => {
-                    let speciesNameForURL = species.replace(/ /g, '%20');
-                    const lowerCaseName = speciesNameForURL.toLowerCase();
-                    const capitalizedName = speciesNameForURL.charAt(0).toUpperCase() + speciesNameForURL.slice(1);
-                    const imagePath = `https://raw.githubusercontent.com/boobalootoo/CARDDECKDONOTEDIT/main/${capitalizedName}.png`;
-                    const imagePathLower = `https://raw.githubusercontent.com/boobalootoo/CARDDECKDONOTEDIT/main/${lowerCaseName}.png`;
-                    const imagePathAllLower = `https://raw.githubusercontent.com/boobalootoo/CARDDECKDONOTEDIT/main/${speciesNameForURL.toLowerCase()}.png`;
-
-                    // Check if the image exists
-                    const img = new Image();
-                    img.src = imagePath;
-                    img.onload = () => {
-                        speciesCardImg.src = imagePath;
-                        speciesCardImg.alt = species;
-                        speciesCardContainer.style.display = "flex";
-                    };
-                    img.onerror = () => {
-                        const imgLower = new Image();
-                        imgLower.src = imagePathLower;
-                        imgLower.onload = () => {
-                            speciesCardImg.src = imagePathLower;
-                            speciesCardImg.alt = species;
-                            speciesCardContainer.style.display = "flex";
-                        }
-                        imgLower.onerror = () => {
-                            const imgAllLower = new Image();
-                            imgAllLower.src = imagePathAllLower;
-                            imgAllLower.onload = () => {
-                                speciesCardImg.src = imagePathAllLower;
-                                speciesCardImg.alt = species;
-                                speciesCardContainer.style.display = "flex";
-                            }
-                            imgAllLower.onerror = () => {
-                                alert(`Card for ${species} not found`);
-                            }
-                        }
-                    }
-
+                    // Success message or further actions can be added here
+                    console.log("Record submitted successfully!");
                 })
                 .catch(error => console.error("Error:", error));
             }
@@ -109,7 +72,7 @@
                 <td></td>
                 <td>
                     <div class="autocomplete">
-                        <input type="text" id="speciesInput" placeholder="Species you think it is">
+                        <input type="text" id="speciesInput" placeholder="Species">
                     </div>
                 </td>
                 <td>
@@ -158,19 +121,7 @@
                 columns.forEach((column, index) => {
                     const cell = newRow.insertCell(index);
                     const speciesName = column.trim();
-
-                    if (index === 0 || index === 1 || index === 2) {
-                        const img = document.createElement("img");
-                        img.src = `https://boobalootoo.github.io/simplifiedgame/images/${speciesName}.png`;
-                        img.alt = speciesName;
-                        img.style.width = "50px";
-                        img.style.height = "auto";
-                        cell.appendChild(img);
-                        cell.appendChild(document.createElement("br"));
-                        cell.appendChild(document.createTextNode(speciesName));
-                    } else {
-                        cell.textContent = speciesName;
-                    }
+                    cell.textContent = speciesName;
                 });
             });
         }
@@ -255,39 +206,6 @@
         autocomplete(speciesInput, speciesNames);
 
     });
-</script>
-<script>
-  async function identifySpecies() {
-    const model = await mobilenet.load();
-    const imageInput = document.getElementById('imageInput');
-    const resultsDiv = document.getElementById('results');
-    resultsDiv.innerHTML = '<h2>Results:</h2>';
-
-    try {
-      if (imageInput.files.length > 0) {
-        for (const file of imageInput.files) {
-          const img = document.createElement('img');
-          img.src = await new Promise(resolve => {
-            const reader = new FileReader();
-            reader.onload = e => resolve(e.target.result);
-            reader.readAsDataURL(file);
-          });
-          await img.decode();
-          const predictions = await model.classify(img);
-          predictions.forEach(prediction => {
-            const line = document.createElement('div');
-            line.innerHTML = `<strong>${prediction.className}</strong> - ${(prediction.probability * 100).toFixed(2)}%`;
-            resultsDiv.appendChild(line);
-          });
-        }
-      } else {
-        resultsDiv.innerHTML += '<div style="color:red;">Please upload an image first.</div>';
-      }
-    } catch (error) {
-      resultsDiv.innerHTML += '<div style="color:red;">Error processing images. Please try again.</div>';
-      console.error('Error:', error);
-    }
-  }
 </script>
 </body>
 </html>
