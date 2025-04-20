@@ -10,10 +10,14 @@
 <div class="container">
   <div id="table-container"></div>
 <script>
-  fetch('https://github.com/boobalootoo/split2/blob/main/species-table.html')
+  fetch('https://raw.githubusercontent.com/boobalootoo/split2/main/species-table.html')
     .then(response => response.text())
     .then(html => {
       document.getElementById('table-container').innerHTML = html;
+    })
+    .catch(error => {
+      console.error("Error fetching species-table.html:", error);
+      document.getElementById('table-container').innerHTML = '<p style="color: red;">Failed to load table data.</p>';
     });
 </script>
 
@@ -28,67 +32,176 @@
 
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        const table = document.getElementById("species-records");
-        const addRowBtn = document.querySelector(".add-row");
-        const speciesCardContainer = document.getElementById("species-card-container");
-        const speciesCard = document.getElementById("species-card");
-        const speciesCardImg = document.getElementById("species-card-img");
-        const closeCardButton = document.getElementById("close-card-button");
+        const tableContainer = document.getElementById("table-container");
+        let table; // Declare table variable outside the fetch callback
+        let addRowBtn;
 
-        let autocompleteInputValue = "";
+        function initializeTableInteraction() {
+            table = document.getElementById("species-records");
+            addRowBtn = document.querySelector(".add-row");
+            const speciesCardContainer = document.getElementById("species-card-container");
+            const closeCardButton = document.getElementById("close-card-button");
+            let autocompleteInputValue = "";
+            let speciesNames = []; // Initialize speciesNames array
 
-        table.addEventListener("click", function(event) {
-            if (event.target.classList.contains("submit-btn")) {
-                console.log("Submit button clicked!");
+            if (table) {
+                table.addEventListener("click", function(event) {
+                    if (event.target.classList.contains("submit-btn")) {
+                        console.log("Submit button clicked!");
 
-                const row = event.target.closest("tr");
-                const username = row.cells[0].querySelector("input").value.trim() || "Unknown";
-                const species = autocompleteInputValue || row.cells[2].querySelector("input").value.trim() || "Not specified"; // Use autocomplete value
-                const date = row.cells[3].querySelector("input").value.trim() || "No date";
-                const place = row.cells[4].querySelector("input").value.trim() || "Unknown location";
+                        const row = event.target.closest("tr");
+                        const username = row.cells[0].querySelector("input").value.trim() || "Unknown";
+                        const species = autocompleteInputValue || row.cells[2].querySelector("input").value.trim() || "Not specified"; // Use autocomplete value
+                        const date = row.cells[3].querySelector("input").value.trim() || "No date";
+                        const place = row.cells[4].querySelector("input").value.trim() || "Unknown location";
 
-                const record = { username, species, date, place };
-                console.log("Submitting record:", record);
+                        const record = { username, species, date, place };
+                        console.log("Submitting record:", record);
 
-                fetch("https://script.google.com/macros/s/AKfycbwsG06dGQsqT_22efWAZn9RtadK3JKAoINByzP1KLosycvC-Mv2q0S6Se4fdA84tF9pTw/exec", {
-                    method: "POST",
-                    mode: "no-cors",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(record)
-                })
-                .then(() => {
-                    // Success message or further actions can be added here
-                    console.log("Record submitted successfully!");
-                })
-                .catch(error => console.error("Error:", error));
+                        fetch("https://script.google.com/macros/s/AKfycbwsG06dGQsqT_22efWAZn9RtadK3JKAoINByzP1KLosycvC-Mv2q0S6Se4fdA84tF9pTw/exec", {
+                            method: "POST",
+                            mode: "no-cors",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(record)
+                        })
+                        .then(() => {
+                            console.log("Record submitted successfully!");
+                        })
+                        .catch(error => console.error("Error:", error));
+                    }
+                });
+            } else {
+                console.error("Error: Element with ID 'species-records' not found after loading.");
             }
-        });
 
-        addRowBtn.addEventListener("click", function() {
-            console.log("Adding a new row");
-            const newRow = document.createElement("tr");
-            newRow.innerHTML = `
-                <td><input type="text" placeholder="Enter username"></td>
-                <td></td>
-                <td>
-                    <div class="autocomplete">
-                        <input type="text" id="speciesInput" placeholder="Species">
-                    </div>
-                </td>
-                <td>
-                    <input type="text" class="date" placeholder="Enter manually">
-                    <button class="button date-btn" onclick="getDate(this)">USE DEVICE DATE</button>
-                </td>
-                <td>
-                    <input type="text" class="place" placeholder="Enter manually">
-                    <button class="button location-btn" onclick="getLocation(this)">USE DEVICE LOCATION</button>
-                </td>
-                <td><button class="button submit-btn">SUBMIT</button></td>
-            `;
-            const newCell = newRow.cells[2].querySelector("#speciesInput")
-            autocomplete(newCell, speciesNames);
-            table.appendChild(newRow);
-        });
+            if (addRowBtn) {
+                addRowBtn.addEventListener("click", function() {
+                    console.log("Adding a new row");
+                    const newRow = document.createElement("tr");
+                    newRow.innerHTML = `
+                        <td><input type="text" placeholder="Enter username"></td>
+                        <td></td>
+                        <td>
+                            <div class="autocomplete">
+                                <input type="text" id="speciesInput" placeholder="Species">
+                            </div>
+                        </td>
+                        <td>
+                            <input type="text" class="date" placeholder="Enter manually">
+                            <button class="button date-btn" onclick="getDate(this)">USE DEVICE DATE</button>
+                        </td>
+                        <td>
+                            <input type="text" class="place" placeholder="Enter manually">
+                            <button class="button location-btn" onclick="getLocation(this)">USE DEVICE LOCATION</button>
+                        </td>
+                        <td><button class="button submit-btn">SUBMIT</button></td>
+                    `;
+                    const newCell = newRow.cells[2].querySelector("#speciesInput");
+                    autocomplete(newCell, speciesNames);
+                    if (table && table.getElementsByTagName("tbody")[0]) {
+                        table.getElementsByTagName("tbody")[0].appendChild(newRow);
+                    } else if (table) {
+                        const tbody = document.createElement('tbody');
+                        tbody.appendChild(newRow);
+                        table.appendChild(tbody);
+                    } else {
+                        console.error("Error: Table body not found.");
+                    }
+                });
+            } else {
+                console.error("Error: Element with class 'add-row' not found.");
+            }
+
+            if (closeCardButton) {
+                closeCardButton.addEventListener('click', () => {
+                    speciesCardContainer.style.display = 'none';
+                });
+            } else {
+                console.error("Error: Element with ID 'close-card-button' not found.");
+            }
+
+            function autocomplete(inp, arr) {
+                var currentFocus;
+                inp.addEventListener("input", function(e) {
+                    var a, b, i, val = this.value;
+                    autocompleteInputValue = val;
+                    closeAllLists();
+                    if (!val) { return false; }
+                    currentFocus = -1;
+                    a = document.createElement("div");
+                    a.setAttribute("id", this.id + "autocomplete-list");
+                    a.setAttribute("class", "autocomplete-items");
+                    this.parentNode.appendChild(a);
+                    for (i = 0; i < arr.length; i++) {
+                        if (arr[i].substr(0, val.length).toUpperCase() == val.toUpperCase()) {
+                            b = document.createElement("div");
+                            b.innerHTML = "<strong>" + arr[i].substr(0, val.length) + "</strong>";
+                            b.innerHTML += arr[i].substr(val.length);
+                            b.innerHTML += "<input type='hidden' value='" + arr[i] + "'>";
+                            b.addEventListener("click", function(e) {
+                                inp.value = this.getElementsByTagName("input")[0].value;
+                                autocompleteInputValue = this.getElementsByTagName("input")[0].value;
+                                closeAllLists();
+                            });
+                            a.appendChild(b);
+                        }
+                    }
+                });
+                inp.addEventListener("keydown", function(e) {
+                    var x = document.getElementById(this.id + "autocomplete-list");
+                    if (x) x = x.getElementsByTagName("div");
+                    if (e.keyCode == 40) {
+                        currentFocus++;
+                        addActive(x);
+                    } else if (e.keyCode == 38) {
+                        currentFocus--;
+                        addActive(x);
+                    } else if (e.keyCode == 13) {
+                        e.preventDefault();
+                        if (currentFocus > -1) {
+                            if (x) x[currentFocus].click();
+                        }
+                    }
+                });
+                function addActive(x) {
+                    if (!x) return false;
+                    removeActive(x);
+                    if (currentFocus >= x.length) currentFocus = 0;
+                    if (currentFocus < 0) currentFocus = (x.length - 1);
+                    x[currentFocus].classList.add("autocomplete-active");
+                }
+                function removeActive(x) {
+                    for (var i = 0; i < x.length; i++) {
+                        x[i].classList.remove("autocomplete-active");
+                    }
+                }
+                function closeAllLists(elmnt) {
+                    var x = document.getElementsByClassName("autocomplete-items");
+                    for (var i = 0; i < x.length; i++) {
+                        if (elmnt != x[i] && elmnt != inp) {
+                            x[i].parentNode.removeChild(x[i]);
+                        }
+                    }
+                }
+                document.addEventListener("click", function (e) {
+                    closeAllLists(e.target);
+                });
+            }
+
+            const speciesInput = document.getElementById("speciesInput");
+            if (speciesInput) {
+                fetch('https://raw.githubusercontent.com/boobalootoo/split2/main/species-table.html')
+                    .then(response => response.text())
+                    .then(csvData => {
+                        const rows = csvData.split("\n").slice(1);
+                        speciesNames = rows.flatMap(row => row.split(",").map(col => col.trim())).filter(Boolean);
+                        autocomplete(speciesInput, speciesNames);
+                    })
+                    .catch(error => console.error("Error fetching species data for autocomplete:", error));
+            } else {
+                console.error("Error: Element with ID 'speciesInput' not found.");
+            }
+        }
 
         window.getDate = function(button) {
             button.previousElementSibling.value = new Date().toISOString().split("T")[0];
@@ -104,107 +217,22 @@
             }
         };
 
-        
-        const speciesList = document.getElementById("speciesTable").getElementsByTagName("tbody")[0];
-        const speciesNames = csvData.split("\n").slice(1).flatMap(row => {
-            const columns = row.split(",");
-            return columns.map(col => col.trim());
-        }).filter(Boolean);
-
-
-        function populateSpeciesTable() {
-            const rows = csvData.split("\n").slice(1);
-            rows.forEach(row => {
-                const columns = row.split(",");
-                const newRow = speciesList.insertRow();
-
-                columns.forEach((column, index) => {
-                    const cell = newRow.insertCell(index);
-                    const speciesName = column.trim();
-                    cell.textContent = speciesName;
-                });
+        // Call initializeTableInteraction after the table-container's content is loaded
+        const tableContainerElement = document.getElementById('table-container');
+        if (tableContainerElement) {
+            const observer = new MutationObserver(mutationsList => {
+                for(const mutation of mutationsList) {
+                    if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                        initializeTableInteraction();
+                        observer.disconnect(); // Stop observing once initialized
+                        break;
+                    }
+                }
             });
+            observer.observe(tableContainerElement, { childList: true });
+        } else {
+            console.error("Error: Element with ID 'table-container' not found.");
         }
-
-        populateSpeciesTable();
-
-        closeCardButton.addEventListener('click', () => {
-            speciesCardContainer.style.display = 'none';
-            speciesCardImg.src = "";
-            speciesCardImg.alt = "";
-        });
-
-        function autocomplete(inp, arr) {
-            var currentFocus;
-            inp.addEventListener("input", function(e) {
-                var a, b, i, val = this.value;
-                autocompleteInputValue = val;
-                closeAllLists();
-                if (!val) { return false; }
-                currentFocus = -1;
-                a = document.createElement("div");
-                a.setAttribute("id", this.id + "autocomplete-list");
-                a.setAttribute("class", "autocomplete-items");
-                this.parentNode.appendChild(a);
-                for (i = 0; i < arr.length; i++) {
-                    if (arr[i].substr(0, val.length).toUpperCase() == val.toUpperCase()) {
-                        b = document.createElement("div");
-                        b.innerHTML = "<strong>" + arr[i].substr(0, val.length) + "</strong>";
-                        b.innerHTML += arr[i].substr(val.length);
-                        b.innerHTML += "<input type='hidden' value='" + arr[i] + "'>";
-                        b.addEventListener("click", function(e) {
-                            inp.value = this.getElementsByTagName("input")[0].value;
-                            autocompleteInputValue = this.getElementsByTagName("input")[0].value;
-                            closeAllLists();
-                        });
-                        a.appendChild(b);
-                    }
-                }
-            });
-            inp.addEventListener("keydown", function(e) {
-                var x = document.getElementById(this.id + "autocomplete-list");
-                if (x) x = x.getElementsByTagName("div");
-                if (e.keyCode == 40) {
-                    currentFocus++;
-                    addActive(x);
-                } else if (e.keyCode == 38) {
-                    currentFocus--;
-                    addActive(x);
-                } else if (e.keyCode == 13) {
-                    e.preventDefault();
-                    if (currentFocus > -1) {
-                        if (x) x[currentFocus].click();
-                    }
-                }
-            });
-            function addActive(x) {
-                if (!x) return false;
-                removeActive(x);
-                if (currentFocus >= x.length) currentFocus = 0;
-                if (currentFocus < 0) currentFocus = (x.length - 1);
-                x[currentFocus].classList.add("autocomplete-active");
-            }
-            function removeActive(x) {
-                for (var i = 0; i < x.length; i++) {
-                    x[i].classList.remove("autocomplete-active");
-                }
-            }
-            function closeAllLists(elmnt) {
-                var x = document.getElementsByClassName("autocomplete-items");
-                for (var i = 0; i < x.length; i++) {
-                    if (elmnt != x[i] && elmnt != inp) {
-                        x[i].parentNode.removeChild(x[i]);
-                    }
-                }
-            }
-            document.addEventListener("click", function (e) {
-                closeAllLists(e.target);
-            });
-        }
-
-        const speciesInput = document.getElementById("speciesInput");
-        autocomplete(speciesInput, speciesNames);
-
     });
 </script>
 </body>
