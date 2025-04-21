@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Species Identification</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f2f2f2;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 1400px;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 10px;
+      vertical-align: top;
+    }
+    input[type="text"], select {
+      padding: 5px;
+      width: 100%;
+    }
+    .button {
+      margin-top: 5px;
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+    #species-card-container {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      background-color: rgba(0, 0, 0, 0.8);
+    }
+    #species-card {
+      background: white;
+      padding: 20px;
+      text-align: center;
+      border-radius: 8px;
+    }
+    #species-card img {
+      max-width: 300px;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>Species Identification Table</h1>
+  <button class="button" onclick="addRow()">Add New Row</button>
+  <table id="species-table">
+    <thead>
+      <tr>
+        <th>Username</th>
+        <th>Photo</th>
+        <th>Species Identification</th>
+        <th>Date</th>
+        <th>Place</th>
+        <th>Submit</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<div id="species-card-container">
+  <div id="species-card">
+    <img id="species-card-img" alt="Species card">
+    <br><br>
+    <button onclick="document.getElementById('species-card-container').style.display='none'">Close</button>
+  </div>
+</div>
+
+<script>
+let rowCount = 0;
+
+function addRow() {
+  const table = document.querySelector("#species-table tbody");
+  const row = document.createElement("tr");
+  const videoId = `video${rowCount}`;
+  const canvasId = `canvas${rowCount}`;
+  const captureBtnId = `capture${rowCount}`;
+  const previewImgId = `preview${rowCount}`;
+
+  row.innerHTML = `
+    <td><input type="text" placeholder="Username"></td>
+    <td>
+      <video id="${videoId}" autoplay style="width: 200px;"></video><br>
+      <canvas id="${canvasId}" style="display: none;"></canvas><br>
+      <button class="button" id="${captureBtnId}">Capture</button><br>
+      <img id="${previewImgId}" style="width: 200px; margin-top: 10px;" />
+    </td>
+    <td>
+      <input type="text" placeholder="Species name"><br>
+      <input type="file" accept="image/*" id="file-upload-${rowCount}" />
+      <br><img id="id-preview-${rowCount}" style="width: 200px; margin-top: 10px; display: none;" />
+      <button class="button" onclick="identifyFromFile(${rowCount})">IDENTIFY</button>
+      <button class="button" onclick="identifyFromWebcam(${rowCount})">IDENTIFY FROM WEBCAM</button>
+    </td>
+    <td>
+      <input type="text" placeholder="Enter manually">
+      <button class="button" onclick="this.previousElementSibling.value=new Date().toISOString().split('T')[0]">USE DEVICE DATE</button>
+    </td>
+    <td>
+      <input type="text" placeholder="Enter manually">
+      <button class="button" onclick="useLocation(this)">USE DEVICE LOCATION</button>
+    </td>
+    <td><button class="button" onclick="submitRow(this)">SUBMIT</button></td>
+  `;
+
+  table.appendChild(row);
+
+  // Start camera for this row
+  const video = document.getElementById(videoId);
+  navigator.mediaDevices.getUserMedia({ video: true })
+    .then(stream => {
+      video.srcObject = stream;
+    })
+    .catch(err => {
+      video.outerHTML = `<p>Camera unavailable</p>`;
+    });
+
+  // Capture image
+  document.getElementById(captureBtnId).addEventListener("click", () => {
+    const canvas = document.getElementById(canvasId);
+    const ctx = canvas.getContext("2d");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataURL = canvas.toDataURL("image/png");
+    document.getElementById(previewImgId).src = dataURL;
+  });
+
+  rowCount++;
+}
+
+function useLocation(button) {
+  const input = button.previousElementSibling;
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(position => {
+      input.value = `Lat: ${position.coords.latitude.toFixed(2)}, Lon: ${position.coords.longitude.toFixed(2)}`;
+    }, () => alert("Location access denied."));
+  } else {
+    alert("Geolocation not supported.");
+  }
+}
+
+function submitRow(button) {
+  const row = button.closest("tr");
+  const username = row.cells[0].querySelector("input").value || "Unknown";
+  const species = row.cells[2].querySelector("input").value || "Not specified";
+  const date = row.cells[3].querySelector("input").value || "Unknown date";
+  const place = row.cells[4].querySelector("input").value || "Unknown location";
+
+  const record = { username, species, date, place };
+
+  fetch("https://script.google.com/macros/s/AKfycbwsG06dGQsqT_22efWAZn9RtadK3JKAoINByzP1KLosycvC-Mv2q0S6Se4fdA84tF9pTw/exec", {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(record)
+  });
+
+  const img = new Image();
+  const speciesFormatted = species.trim().replace(/\s+/g, "%20");
+  const imagePath = `https://raw.githubusercontent.com/boobalootoo/CARDDECKDONOTEDIT/main/${speciesFormatted}.png`;
+  img.src = imagePath;
+  img.onload = () => {
+    document.getElementById("species-card-img").src = imagePath;
+    document.getElementById("species-card-img").alt = species;
+    document.getElementById("species-card-container").style.display = "flex";
+  };
+  img.onerror = () => alert(`Card for "${species}" not found.`);
+}
+
+// Identify species from uploaded file
+function identifyFromFile(rowId) {
+  const fileInput = document.getElementById(`file-upload-${rowId}`);
+  const preview = document.getElementById(`id-preview-${rowId}`);
+  
+  if (fileInput.files && fileInput.files[0]) {
+    const file = fileInput.files[0];
+    preview.src = URL.createObjectURL(file);
+    preview.style.display = 'block';
+    
+    setTimeout(() => {
+      const speciesName = "Common Oak"; // Replace with actual model call
+      document.querySelector(`#species-table tbody tr:nth-child(${rowId + 1}) td:nth-child(3) input`).value = speciesName;
+      alert(`Identified from image: ${speciesName}`);
+    }, 1500);
+  }
+}
+
+// Identify species from webcam capture
+function identifyFromWebcam(rowId) {
+  const previewImg = document.getElementById(`preview${rowId}`);
+  
+  if (!previewImg || !previewImg.src || previewImg.src === window.location.href) {
+    alert("Please capture an image from the webcam first.");
+    return;
+  }
+
+  setTimeout(() => {
+    const speciesName = "European Robin"; // Replace with actual model call
+    document.querySelector(`#species-table tbody tr:nth-child(${rowId + 1}) td:nth-child(3) input`).value = speciesName;
+    alert(`Identified from webcam: ${speciesName}`);
+  }, 1500);
+}
+</script>
+</body>
+</html>
