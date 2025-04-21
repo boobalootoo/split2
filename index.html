@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Species Identification</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.2.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
+</head>
+<body>
+  <div class="container">
+    <div id="table-container"></div>
+  </div>
+
+<script>
+  let csvData = "";
+
+  fetch('species-table.html')
+    .then(response => response.text())
+    .then(html => {
+      document.getElementById('table-container').innerHTML = html;
+      fetch('uk_species_list.csv')
+        .then(response => response.text())
+        .then(data => {
+          csvData = data;
+          initializeScripts();
+        })
+        .catch(error => console.error('Error fetching CSV:', error));
+    });
+
+  function initializeScripts() {
+    const table = document.getElementById("species-records");
+    const addRowBtn = document.querySelector(".add-row");
+    const speciesCardContainer = document.getElementById("species-card-container");
+    const speciesCardImg = document.getElementById("species-card-img");
+    const closeCardButton = document.getElementById("close-card-button");
+    let autocompleteInputValue = "";
+
+    function startCamera(videoElement) {
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+          videoElement.srcObject = stream;
+          videoElement.play();
+        })
+        .catch(err => {
+          console.error("Error accessing camera: ", err);
+        });
+    }
+
+    if (addRowBtn) {
+      addRowBtn.addEventListener("click", function() {
+        const newRow = document.createElement("tr");
+        newRow.innerHTML = `
+          <td><input type="text" placeholder="Enter username"></td>
+          <td><video autoplay playsinline style="width: 150px; height: auto; border: 1px solid black;"></video></td>
+          <td>
+            <div id="identification-container">
+              <h1>UK Species Identifier (Powered by iNaturalist)</h1>
+              <label for="groupSelect">Select group (optional):</label>
+              <select id="groupSelect">
+                <option value="">Any</option>
+                <option value="3">Animals</option>
+                <option value="47126">Plants</option>
+                <option value="47170">Fungi</option>
+              </select>
+              <br><br>
+              <input type="file" id="imageInput" accept="image/*">
+              <img id="preview" style="max-width: 300px; margin-top: 10px;" />
+              <br>
+              <button onclick="identifySpecies()">Identify</button>
+              <div id="results" style="margin-top: 20px;"></div>
+              <div class="autocomplete">
+                <input type="text" id="speciesInput" placeholder="Species you think it is">
+              </div>
+            </div>
+          </td>
+          <td>
+            <input type="text" class="date" placeholder="Enter manually">
+            <button class="button date-btn" onclick="getDate(this)">USE DEVICE DATE</button>
+          </td>
+          <td>
+            <input type="text" class="place" placeholder="Enter manually">
+            <button class="button location-btn" onclick="getLocation(this)">USE DEVICE LOCATION</button>
+          </td>
+          <td><button class="button submit-btn">SUBMIT</button></td>
+        `;
+
+        const videoElement = newRow.cells[1].querySelector("video");
+        startCamera(videoElement);
+
+        const newCell = newRow.cells[2].querySelector("#speciesInput");
+        autocomplete(newCell, speciesNames);
+
+        if (table) table.appendChild(newRow);
+      });
+    }
+
+    window.getDate = function(button) {
+      button.previousElementSibling.value = new Date().toISOString().split("T")[0];
+    };
+
+    window.getLocation = function(button) {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(position) {
+          button.previousElementSibling.value = `Lat: ${position.coords.latitude.toFixed(2)}, Lon: ${position.coords.longitude.toFixed(2)}`;
+        });
+      } else {
+        alert("Geolocation not supported by this browser.");
+      }
+    };
+
+    let speciesNames = [];
+    if (csvData) {
+      const rows = csvData.split("\n").slice(1);
+      speciesNames = rows.flatMap(row => row.split(",").map(col => col.trim())).filter(Boolean);
+    }
+
+    function autocomplete(inp, arr) {
+      let currentFocus;
+      inp.addEventListener("input", function(e) {
+        let a, b, i, val = this.value;
+        autocompleteInputValue = val;
+        closeAllLists();
+        if (!val) return false;
+        currentFocus = -1;
+        a = document.createElement("div");
+        a.setAttribute("id", this.id + "autocomplete-list");
+        a.setAttribute("class", "autocomplete-items");
+        this.parentNode.appendChild(a);
+        for (i = 0; i < arr.length; i++) {
+          if (arr[i].substr(0, val.length).toUpperCase() == val.toUpperCase()) {
+            b = document.createElement("div");
+            b.innerHTML = "<strong>" + arr[i].substr(0, val.length) + "</strong>";
+            b.innerHTML += arr[i].substr(val.length);
+            b.innerHTML += "<input type='hidden' value='" + arr[i] + "'>";
+            b.addEventListener("click", function() {
+              inp.value = this.getElementsByTagName("input")[0].value;
+              autocompleteInputValue = this.getElementsByTagName("input")[0].value;
+              closeAllLists();
+            });
+            a.appendChild(b);
+          }
+        }
+      });
+
+      inp.addEventListener("keydown", function(e) {
+        let x = document.getElementById(this.id + "autocomplete-list");
+        if (x) x = x.getElementsByTagName("div");
+        if (e.keyCode == 40) {
+          currentFocus++;
+          addActive(x);
+        } else if (e.keyCode == 38) {
+          currentFocus--;
+          addActive(x);
+        } else if (e.keyCode == 13) {
+          e.preventDefault();
+          if (currentFocus > -1 && x) x[currentFocus].click();
+        }
+      });
+
+      function addActive(x) {
+        if (!x) return false;
+        removeActive(x);
+        if (currentFocus >= x.length) currentFocus = 0;
+        if (currentFocus < 0) currentFocus = x.length - 1;
+        x[currentFocus].classList.add("autocomplete-active");
+      }
+
+      function removeActive(x) {
+        for (let i = 0; i < x.length; i++) {
+          x[i].classList.remove("autocomplete-active");
+        }
+      }
+
+      function closeAllLists(elmnt) {
+        const x = document.getElementsByClassName("autocomplete-items");
+        for (let i = 0; i < x.length; i++) {
+          if (elmnt != x[i] && elmnt != inp) {
+            x[i].parentNode.removeChild(x[i]);
+          }
+        }
+      }
+
+      document.addEventListener("click", function (e) {
+        closeAllLists(e.target);
+      });
+    }
+
+    window.identifySpecies = async function() {
+      const input = document.getElementById('imageInput');
+      const file = input.files[0];
+      const taxonId = document.getElementById('groupSelect').value;
+      const resultsDiv = document.getElementById("results");
+      if (resultsDiv) resultsDiv.innerHTML = "";
+
+      if (!file) {
+        alert("Please upload an image.");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = () => document.getElementById('preview').src = reader.result;
+      reader.readAsDataURL(file);
+
+      const formData = new FormData();
+      formData.append("image", file);
+      formData.append("place_id", "6857");
+      if (taxonId) formData.append("taxon_id", taxonId);
+
+      const apiEndpoint = "https://api.inaturalist.org/v1/computervision/score_image";
+      try {
+        const response = await fetch(apiEndpoint, { method: "POST", body: formData });
+        const result = await response.json();
+        resultsDiv.innerHTML = JSON.stringify(result, null, 2);
+      } catch (error) {
+        console.error("Species ID error:", error);
+      }
+    };
+  }
+</script>
+</body>
+</html>
