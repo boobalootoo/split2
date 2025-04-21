@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Species Identification</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.2.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f2f2f2;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    th, td {
+      border: 1px solid #ccc;
+      padding: 10px;
+    }
+
+    input[type="text"], select {
+      padding: 5px;
+      width: 100%;
+    }
+
+    .button {
+      margin-top: 5px;
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+
+    .autocomplete {
+      position: relative;
+    }
+
+    .autocomplete-items {
+      position: absolute;
+      border: 1px solid #d4d4d4;
+      border-bottom: none;
+      border-top: none;
+      z-index: 99;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: white;
+    }
+
+    .autocomplete-items div {
+      padding: 10px;
+      cursor: pointer;
+    }
+
+    .autocomplete-items div:hover {
+      background-color: #e9e9e9;
+    }
+
+    .autocomplete-active {
+      background-color: #1e90ff !important;
+      color: #ffffff;
+    }
+
+    #species-card-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      background-color: rgba(0, 0, 0, 0.8);
+    }
+
+    #species-card {
+      background: white;
+      padding: 20px;
+      text-align: center;
+      border-radius: 8px;
+    }
+
+    #species-card img {
+      max-width: 300px;
+    }
+
+    #close-card-button {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Species Identification Table</h1>
+    <button class="add-row button">Add New Row</button>
+    <table id="species-records">
+      <thead>
+        <tr>
+          <th>Username</th>
+          <th>Photo</th>
+          <th>Species Identification</th>
+          <th>Date</th>
+          <th>Place</th>
+          <th>Submit</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div id="species-card-container">
+    <div id="species-card">
+      <img id="species-card-img" alt="Species card">
+      <br>
+      <button id="close-card-button">Close</button>
+    </div>
+  </div>
+
+  <script>
+    let csvData = "";
+    let speciesNames = [];
+
+    fetch('uk_species_list.csv')
+      .then(response => response.text())
+      .then(data => {
+        csvData = data;
+        const rows = csvData.split("\n").slice(1);
+        speciesNames = rows.flatMap(row => row.split(",").map(col => col.trim())).filter(Boolean);
+      });
+
+    const table = document.getElementById("species-records").getElementsByTagName("tbody")[0];
+    const speciesCardContainer = document.getElementById("species-card-container");
+    const speciesCardImg = document.getElementById("species-card-img");
+    const closeCardButton = document.getElementById("close-card-button");
+    let autocompleteInputValue = "";
+
+    document.querySelector(".add-row").addEventListener("click", () => {
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td><input type="text" placeholder="Enter username"></td>
+        <td>
+  <div style="max-width: 320px; overflow: hidden;">
+    <video id="liveCamera" autoplay></video>
+  </div>
+  <canvas id="canvas" style="display: none;"></canvas>
+  <br>
+  <input type="file" id="fileInput" accept="image/*">
+  <button id="captureButton">Capture Image</button>
+  <p id="status"></p>
+  <div style="text-align: center; margin-top: 10px;">
+    <button id="zoomIn">+</button>
+    <button id="zoomOut">-</button>
+  </div>
+  <br>
+  <button id="submitButton">Submit</button>
+</td>
+
+        <td>
+          <div id="identification-container">
+            <label for="groupSelect">Group (optional):</label>
+            <select id="groupSelect">
+              <option value="">Any</option>
+              <option value="3">Animals</option>
+              <option value="47126">Plants</option>
+              <option value="47170">Fungi</option>
+            </select>
+            <br><br>
+            <input type="file" id="imageInput" accept="image/*">
+            <img id="preview" style="max-width: 300px; margin-top: 10px;" />
+            <br>
+            <button onclick="identifySpecies()">Identify</button>
+            <div id="results" style="margin-top: 20px;"></div>
+            <div class="autocomplete">
+              <input type="text" id="speciesInput" placeholder="Species you think it is">
+            </div>
+          </div>
+        </td>
+        <td>
+          <input type="text" class="date" placeholder="Enter manually">
+          <button class="button date-btn" onclick="getDate(this)">USE DEVICE DATE</button>
+        </td>
+        <td>
+          <input type="text" class="place" placeholder="Enter manually">
+          <button class="button location-btn" onclick="getLocation(this)">USE DEVICE LOCATION</button>
+        </td>
+        <td><button class="button submit-btn">SUBMIT</button></td>
+      `;
+      table.appendChild(row);
+      autocomplete(row.querySelector("#speciesInput"), speciesNames);
+    });
+
+    table.addEventListener("click", function(event) {
+      if (event.target.classList.contains("submit-btn")) {
+        const row = event.target.closest("tr");
+        const username = row.cells[0].querySelector("input").value.trim() || "Unknown";
+        const species = autocompleteInputValue || row.cells[2].querySelector("input").value.trim() || "Not specified";
+        const date = row.cells[3].querySelector("input").value.trim() || "No date";
+        const place = row.cells[4].querySelector("input").value.trim() || "Unknown location";
+
+        const record = { username, species, date, place };
+        fetch("https://script.google.com/macros/s/AKfycbwsG06dGQsqT_22efWAZn9RtadK3JKAoINByzP1KLosycvC-Mv2q0S6Se4fdA84tF9pTw/exec", {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(record)
+        }).then(() => {
+          const imagePath = `https://raw.githubusercontent.com/boobalootoo/CARDDECKDONOTEDIT/main/${species}.png`;
+          const img = new Image();
+          img.src = imagePath;
+          img.onload = () => {
+            speciesCardImg.src = imagePath;
+            speciesCardImg.alt = species;
+            speciesCardContainer.style.display = "flex";
+          };
+          img.onerror = () => alert(`Card for ${species} not found`);
+        });
+      }
+    });
+
+    closeCardButton.addEventListener("click", () => {
+      speciesCardContainer.style.display = "none";
+      speciesCardImg.src = "";
+      speciesCardImg.alt = "";
+    });
+
+    window.getDate = function(button) {
+      button.previousElementSibling.value = new Date().toISOString().split("T")[0];
+    };
+
+    window.getLocation = function(button) {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(position) {
+          button.previousElementSibling.value = `Lat: ${position.coords.latitude.toFixed(2)}, Lon: ${position.coords.longitude.toFixed(2)}`;
+        });
+      } else {
+        alert("Geolocation is not supported.");
+      }
+    };
+
+    function autocomplete(inp, arr) {
+      let currentFocus;
+      inp.addEventListener("input", function(e) {
+        let val = this.value;
+        autocompleteInputValue = val;
+        closeAllLists();
+        if (!val) return false;
+        currentFocus = -1;
+        const list = document.createElement("div");
+        list.setAttribute("id", this.id + "autocomplete-list");
+        list.setAttribute("class", "autocomplete-items");
+        this.parentNode.appendChild(list);
+        arr.forEach(item => {
+          if (item.substr(0, val.length).toUpperCase() === val.toUpperCase()) {
+            const div = document.createElement("div");
+            div.innerHTML = "<strong>" + item.substr(0, val.length) + "</strong>" + item.substr(val.length);
+            div.innerHTML += `<input type='hidden' value='${item}'>`;
+            div.addEventListener("click", function(e) {
+              inp.value = this.getElementsByTagName("input")[0].value;
+              autocompleteInputValue = inp.value;
+              closeAllLists();
+            });
+            list.appendChild(div);
+          }
+        });
+      });
+
+      inp.addEventListener("keydown", function(e) {
+        let x = document.getElementById(this.id + "autocomplete-list");
+        if (x) x = x.getElementsByTagName("div");
+        if (e.keyCode == 40) { currentFocus++; addActive(x); }
+        else if (e.keyCode == 38) { currentFocus--; addActive(x); }
+        else if (e.keyCode == 13) {
+          e.preventDefault();
+          if (currentFocus > -1 && x) x[currentFocus].click();
+        }
+      });
+
+      function addActive(x) {
+        if (!x) return false;
+        removeActive(x);
+        if (currentFocus >= x.length) currentFocus = 0;
+        if (currentFocus < 0) currentFocus = x.length - 1;
+        x[currentFocus].classList.add("autocomplete-active");
+      }
+
+      function removeActive(x) {
+        for (let i = 0; i < x.length; i++) x[i].classList.remove("autocomplete-active");
+      }
+
+      function closeAllLists(elmnt) {
+        const x = document.getElementsByClassName("autocomplete-items");
+        for (let i = 0; i < x.length; i++) {
+          if (elmnt !== x[i] && elmnt !== inp) x[i].parentNode.removeChild(x[i]);
+        }
+      }
+
+      document.addEventListener("click", function(e) {
+        closeAllLists(e.target);
+      });
+    }
+
+    window.identifySpecies = async function () {
+      const input = document.getElementById('imageInput');
+      const file = input.files[0];
+      const taxonId = document.getElementById('groupSelect').value;
+      const resultsDiv = document.getElementById("results");
+      resultsDiv.innerHTML = "";
+
+      if (!file) {
+        alert("Please upload an image.");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = () => document.getElementById('preview').src = reader.result;
+      reader.readAsDataURL(file);
+
+      const formData = new FormData();
+      formData.append("image", file);
+      formData.append("place_id", "6857");
+      if (taxonId) formData.append("taxon_id", taxonId);
+
+      const response = await fetch("https://api.inaturalist.org/v1/computervision/score_image", {
+        method: "POST",
+        body: formData
+      });
+      const data = await response.json();
+      console.log(data);
+      resultsDiv.innerHTML = JSON.stringify(data.results, null, 2);
+    };
+  </script>
+  <script>
+  const video = document.getElementById('liveCamera');
+  const canvas = document.getElementById('canvas');
+  const context = canvas.getContext('2d');
+  const fileInput = document.getElementById('fileInput');
+  const captureButton = document.getElementById('captureButton');
+  const zoomInButton = document.getElementById('zoomIn');
+  const zoomOutButton = document.getElementById('zoomOut');
+  const submitButton = document.getElementById('submitButton');
+
+  let imageBase64 = null;
+  let imageMimeType = null;
+  let imageFileName = null;
+  let stream = null;
+  let currentZoom = 1;
+
+  async function startCamera() {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      video.srcObject = stream;
+      video.onloadedmetadata = () => {
+        video.play();
+
+        zoomInButton.addEventListener('click', () => {
+          currentZoom = Math.min(currentZoom + 0.1, 10);
+          if (stream && 'zoom' in stream.getVideoTracks()[0].getSettings()) {
+            stream.getVideoTracks()[0].applyConstraints({ advanced: [{ zoom: currentZoom }] });
+          }
+        });
+
+        zoomOutButton.addEventListener('click', () => {
+          currentZoom = Math.max(currentZoom - 0.1, 1);
+          if (stream && 'zoom' in stream.getVideoTracks()[0].getSettings()) {
+            stream.getVideoTracks()[0].applyConstraints({ advanced: [{ zoom: currentZoom }] });
+          }
+        });
+      };
+    } catch (err) {
+      console.error("Error accessing camera:", err);
+      alert("Unable to access camera. Make sure permissions are granted.");
+    }
+  }
+
+  startCamera();
+
+  captureButton.addEventListener('click', () => {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    imageBase64 = canvas.toDataURL('image/jpeg').split(',')[1];
+    imageMimeType = 'image/jpeg';
+    imageFileName = 'captured_image.jpg';
+    document.getElementById("status").innerText = "Image captured. Ready to submit.";
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+    }
+    video.srcObject = null;
+  });
+
+  fileInput.addEventListener('change', () => {
+    if (!fileInput.files.length) return;
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+    reader.onloadend = function () {
+      imageBase64 = reader.result.split(',')[1];
+      imageMimeType = file.type;
+      imageFileName = file.name;
+      document.getElementById("status").innerText = "File selected. Ready to submit.";
+    };
+    reader.readAsDataURL(file);
+  });
+
+  submitButton.addEventListener('click', async () => {
+    if (!imageBase64) {
+      alert("Please capture an image or select a file.");
+      return;
+    }
+
+    const response = await fetch("https://script.google.com/macros/s/AKfycbzW8aRLFh9E1WHUuugvvIqOyYBWrMNRmivot0grSBDRb-WX2Se2hCvzIkIdgMaLZG4-8Q/exec", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        image: imageBase64,
+        mimetype: imageMimeType,
+        filename: imageFileName
+      })
+    });
+
+    const result = await response.json();
+    document.getElementById("status").innerText = result.status === "success"
+      ? `Upload successful! Image URL: ${result.url}`
+      : `Upload failed: ${result.message}`;
+
+    imageBase64 = null;
+    imageMimeType = null;
+    imageFileName = null;
+    startCamera();
+  });
+</script>
+
+</body>
+</html>
