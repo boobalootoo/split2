@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Species Table</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <table id="species-records">
+    <tr>
+      <th>Username</th>
+      <th>Photo</th>
+      <th>Species Identification</th>
+      <th>Date</th>
+      <th>Place</th>
+      <th>Submit</th>
+    </tr>
+    <tr>
+      <td><input type="text" placeholder="Enter username" class="username"></td>
+      <td>
+        <video autoplay playsinline id="camera" style="width: 150px; height: auto; border: 1px solid black;"></video><br/>
+        <input type="file" accept="image/*" class="photo-upload">
+      </td>
+      <td>
+        <input type="text" class="species-name" placeholder="Species name (auto-filled)">
+        <button class="button identify-btn">IDENTIFY</button>
+      </td>
+      <td>
+        <input type="text" class="date" placeholder="Enter manually">
+        <button class="button date-btn" onclick="getDate(this)">USE DEVICE DATE</button>
+      </td>
+      <td>
+        <input type="text" class="place" placeholder="Enter manually">
+        <button class="button location-btn" onclick="getLocation(this)">USE DEVICE LOCATION</button>
+      </td>
+      <td>
+        <button class="button submit-btn">SUBMIT</button>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
